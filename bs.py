@@ -4,7 +4,6 @@ import tfutil
 from tensorflow.contrib import slim
 from sklearn.externals import joblib
 import numpy as np
-from tensorflow import keras
 
 
 class BaseModel(snt.AbstractModule):
@@ -38,8 +37,6 @@ def loss_f(labels, logits):
         tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(labels, dtype=tf.float32), logits=logits))
 
 
-tf.reset_default_graph()
-
 data_dir = '/data/hla_data'
 train_data = f'{data_dir}/ms_train.pkl'
 test_data = f'{data_dir}/ms_test.pkl'
@@ -63,21 +60,21 @@ n_gpu = 1
 model_tensors = tfutil.ModelTensors(inputs, labels, is_training, net, train_input_func, loss_func, optimizer)
 model = tfutil.TFModel(model_tensors, n_gpu, model_dir, training=True)
 
-# auc_op = tfutil.metrics_auc(labels, model.logits, curve='ROC')
-# pr_op = tfutil.metrics_auc(labels, model.logits, curve='PR')
-# metric_opdefs = [auc_op, pr_op]
-metric_opdefs = []
+auc_op = tfutil.metrics_auc(labels, model.logits, curve='ROC', name='roc_auc')
+pr_op = tfutil.metrics_auc(labels, model.logits, curve='PR', name='pr_auc')
+metric_opdefs = [auc_op, pr_op]
 
-# pep_te, hla_te, yte = joblib.load(test_data)
-# mixed_te = np.concatenate([pep_te, hla_te], axis=-1)
-# gnte = tfutil.read_tfrec_array([mixed_te, yte], batch_size * 2, shuffle=False)
-#
-# test_listener = tfutil.Listener('test', gnte, metric_opdefs)
-# listeners = [test_listener]
-listeners = []
+
+pep_te, hla_te, yte = joblib.load(test_data)
+mixed_te = np.concatenate([pep_te, hla_te], axis=-1)
+gnte = tfutil.read_tfrec_array([mixed_te, yte], batch_size * 2, shuffle=False)
+
+test_listener = tfutil.Listener('test', gnte, metric_opdefs)
+listeners = [test_listener]
+
 
 num_steps = 3000000
-summ_steps = 1000
+summ_steps = 2000
 ckpt_steps = 10000
 model.train(num_steps, summ_steps, ckpt_steps,
             metric_opdefs, None,
