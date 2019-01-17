@@ -3,7 +3,7 @@ import tfutil
 import numpy as np
 from pyspark import SparkContext, SparkConf
 
-n_cpu = 37
+n_cpu = 38
 conf = SparkConf().setAppName('abc').setMaster(f'local[{n_cpu}]')
 sc = SparkContext.getOrCreate(conf=conf)
 
@@ -40,7 +40,7 @@ lst = trlst + telst
 save_path = '/data/hla_data'
 rdd_names = sc.parallelize(lst, numSlices=n_cpu)
 
-num_examples_per_file = 80000000
+# num_examples_per_file = 80000000
 def foo(fname):
     src_pos = f'{dir_path}/{fname}_pos.txt'
     src_neg = f'{dir_path}/{fname}_neg.txt'
@@ -49,7 +49,7 @@ def foo(fname):
     gn_pos = generator_file(src_pos, dt_hla, dt_aa)
     tfutil.write_tfrec_from_generator(gn_pos, dst_pos, 2)
     gn_neg = generator_file(src_neg, dt_hla, dt_aa)
-    tfutil.write_tfrec_from_generator(gn_neg, dst_neg, 2, num_examples_per_file=num_examples_per_file)
+    tfutil.write_tfrec_from_generator(gn_neg, dst_neg, 2)
 
 
 rdd_names.foreach(foo)
