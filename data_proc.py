@@ -31,9 +31,9 @@ def generator_file(file_name, dict_sample_hla_code, AA_dict):
 num_tr = 69
 num_te = 5
 
-dir_path = '/data/hla_raw'
-trlst = [f'full_data/train/train_sample_{i}' for i in range(num_tr)]
-telst = [f'full_data/test/test_sample_{i}' for i in range(num_te)]
+dir_path = '/data/hla_data/raw'
+trlst = [f'p10_data/train/train_sample_{i}' for i in range(num_tr)]
+telst = [f'p10_data/test/test_sample_{i}' for i in range(num_te)]
 
 lst = trlst + telst
 
