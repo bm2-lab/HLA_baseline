@@ -14,7 +14,7 @@ class BaseModel(snt.AbstractModule):
         self.aa_per_sample = aa_per_sample
         self.nHLA = nHLA
         self.hla_per_sample = hla_per_sample
-        self.embedding_mat = np.eye(self.nHLA + 1, dtype=np.int32)[:,1:]
+        self.embedding_mat = np.eye(self.nHLA + 1, dtype=np.int32)[:, 1:]
 
     def _build(self, inputs, is_training):
         pep_x, hla_x = tf.split(tf.cast(inputs, dtype=tf.int32),
@@ -37,14 +37,19 @@ def loss_f(labels, logits):
         tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(labels, dtype=tf.float32), logits=logits))
 
 
-data_dir = '/data/hla_data'
-train_data = f'{data_dir}/ms_train.pkl'
-test_data = f'{data_dir}/ms_test.pkl'
+import os
 
-pep, hla, y = joblib.load(train_data)
-mixed = np.concatenate([pep, hla], axis=-1)
-batch_size = 250
-train_input_func = tfutil.balanced_read_tfrec_array_func(mixed, y, batch_size=batch_size)
+data_dir = '/data/hla_data/full_data'
+train_all = [k for k in os.listdir(f'{data_dir}/train') if k.endswith('tfrec')]
+num_tr = 69
+assert len(train_all) == num_tr * 2, f'Number of training data must be {num_tr * 2}'
+train_pos = [f'{data_dir}/train/{k}' for k in train_all if '_pos.' in k]
+train_neg = [f'{data_dir}/train/{k}' for k in train_all if '_neg.' in k]
+assert len(train_pos) == num_tr, f'Number of positive training data must be {num_tr}'
+assert len(train_neg) == num_tr, f'Number of negative training data must be {num_tr}'
+
+batch_size_per_class = 2000
+train_input_func = tfutil.balanced_read_tfrec_func([train_pos, train_neg], batch_size_per_class)
 
 inputs = tf.placeholder(dtype=tf.float32, shape=[None, 17])
 labels = tf.placeholder(dtype=tf.int32, shape=[None])
@@ -54,28 +59,28 @@ net = BaseModel()
 loss_func = tfutil.LossFunc(loss_f)
 optimizer = tf.train.AdamOptimizer()
 
-model_dir = 'temp/bs1'
+model_dir = 'temp/bs_full'
 
-n_gpu = 1
+n_gpu = 4
 model_tensors = tfutil.ModelTensors(inputs, labels, is_training, net, train_input_func, loss_func, optimizer)
 model = tfutil.TFModel(model_tensors, n_gpu, model_dir, training=True)
 
 auc_op = tfutil.metrics_auc(labels, model.logits, curve='ROC', name='roc_auc')
-pr_op = tfutil.metrics_auc(labels, model.logits, curve='PR', name='pr_auc')
+pr_op = tfutil.metrics_auc(labels, model.logits, curve='PR', summation_method='careful_interpolation', name='pr_auc')
 metric_opdefs = [auc_op, pr_op]
 
+test_all = [k for k in os.listdir(f'{data_dir}/test') if k.endswith('tfrec')]
+num_te = 5
+listeners = []
+for i in range(num_te):
+    ts = sorted([f'{data_dir}/test/{k}' for k in test_all if f'test_sample_{i}_' in k])
+    gnte = tfutil.read_tfrec(ts, batch_size_per_class * 3, shuffle=False)
+    listener = tfutil.Listener(f'ts{i}', gnte, metric_opdefs)
+    listeners.append(listener)
 
-pep_te, hla_te, yte = joblib.load(test_data)
-mixed_te = np.concatenate([pep_te, hla_te], axis=-1)
-gnte = tfutil.read_tfrec_array([mixed_te, yte], batch_size * 2, shuffle=False)
-
-test_listener = tfutil.Listener('test', gnte, metric_opdefs)
-listeners = [test_listener]
-
-
-num_steps = 3000000
-summ_steps = 2000
-ckpt_steps = 10000
+num_steps = 20000000
+summ_steps = 10000
+ckpt_steps = 100000
 model.train(num_steps, summ_steps, ckpt_steps,
             metric_opdefs, None,
             listeners, max_ckpt_to_keep=10, from_scratch=True)
