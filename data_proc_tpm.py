@@ -3,8 +3,8 @@ import tfutil
 import numpy as np
 from pyspark import SparkContext, SparkConf
 
-n_cpu = 38
-conf = SparkConf().setAppName('abc').setMaster(f'local[{n_cpu}]')
+n_cpu = 74
+conf = SparkConf().setAppName('abc_tpm').setMaster(f'local[{n_cpu}]')
 sc = SparkContext.getOrCreate(conf=conf)
 
 dt_aa, dt_hla = joblib.load('hla_dict.pkl')
@@ -32,8 +32,8 @@ num_tr = 69
 num_te = 5
 
 dir_path = '/data/hla_data/raw'
-trlst = [f'full_data_tpm/train/train_sample_{i}' for i in range(num_tr)]
-telst = [f'full_data_tpm/test/test_sample_{i}' for i in range(num_te)]
+trlst = [f'p10_data_tpm/train/train_sample_{i}' for i in range(num_tr)]
+telst = [f'p10_data_tpm/test/test_sample_{i}' for i in range(num_te)]
 
 lst = trlst + telst
 

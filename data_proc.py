@@ -3,7 +3,7 @@ import tfutil
 import numpy as np
 from pyspark import SparkContext, SparkConf
 
-n_cpu = 38
+n_cpu = 74
 conf = SparkConf().setAppName('abc').setMaster(f'local[{n_cpu}]')
 sc = SparkContext.getOrCreate(conf=conf)
 
