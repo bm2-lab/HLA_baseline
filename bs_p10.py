@@ -47,7 +47,7 @@ train_neg = [f'{data_dir}/train/{k}' for k in train_all if '_neg.' in k]
 assert len(train_pos) == num_tr, f'Number of positive training data must be {num_tr}'
 assert len(train_neg) == num_tr, f'Number of negative training data must be {num_tr}'
 
-batch_size_per_class = 2000
+batch_size_per_class = 1000
 train_input_func = tfutil.balanced_read_tfrec_func([train_pos, train_neg], batch_size_per_class)
 
 inputs = tf.placeholder(dtype=tf.float32, shape=[None, 17])
