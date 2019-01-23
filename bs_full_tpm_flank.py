@@ -6,24 +6,32 @@ import numpy as np
 
 
 class BaseTPMModel(snt.AbstractModule):
-    def __init__(self, keep_prob=0.75, nAA=20, aa_per_sample=11, nHLA=100, hla_per_sample=6, name='BaseModel'):
+    def __init__(self, keep_prob=0.75, nAA=22, aa_per_sample=11, nHLA=100,flank_num=10, hla_per_sample=6, name='BaseModel'):
         super(BaseTPMModel, self).__init__(name=name)
         self.keep_prob = keep_prob
         self.nAA = nAA
         self.aa_per_sample = aa_per_sample
         self.nHLA = nHLA
+        self.flank_num=flank_num
         self.hla_per_sample = hla_per_sample
         self.embedding_mat = np.eye(self.nHLA + 1, dtype=np.int32)[:, 1:]
 
     def _build(self, inputs, is_training):
-        pep_x, hla_x, tpm_x = tf.split(tf.cast(inputs, dtype=tf.float32),
-                                num_or_size_splits=[self.aa_per_sample, self.hla_per_sample, 1], axis=-1)
+        pep_x, hla_x, tpm_x ,flank_x= tf.split(tf.cast(inputs, dtype=tf.float32),
+                                num_or_size_splits=[self.aa_per_sample, self.hla_per_sample, 1,self.flank_num], axis=-1)
         pep_x = tf.one_hot(tf.cast(pep_x, dtype=tf.int32), depth=self.nAA + 1)
         pep_net = snt.BatchFlatten()(pep_x)
         pep_net = snt.Linear(256)(pep_net)
         pep_net = tf.nn.relu(pep_net)
         pep_net = slim.dropout(pep_net, self.keep_prob, is_training=is_training)
         pep_logits = snt.Linear(self.nHLA)(pep_net)
+
+        flank_x=tf.one_hot(tf.cast(pep_x,dtype=tf.int32),depth=self.nAA+1)
+        flank_net=snt.BatchFlatten()(flank_x)
+        flank_net=snt.Linear(32)(flank_net)
+        flank_net=tf.nn.relu(flank_net)
+        flank_net=snt.Linear(1)(flank_net)
+
 
         hla_net = tf.nn.embedding_lookup(self.embedding_mat, tf.cast(hla_x, dtype=tf.int32))
         hla_net = tf.reduce_sum(hla_net, axis=1)
@@ -32,7 +40,7 @@ class BaseTPMModel(snt.AbstractModule):
         tpm_net = tf.nn.relu(tpm_net)
         tpm_net = snt.Linear(1)(tpm_net)
 
-        logits = tf.reduce_sum(tf.nn.sigmoid(pep_logits + tpm_net) * tf.cast(hla_net, dtype=tf.float32), axis=-1)
+        logits = tf.reduce_sum(tf.nn.sigmoid(pep_logits + tpm_net+flank_net) * tf.cast(hla_net, dtype=tf.float32), axis=-1)
         return logits
 
 def loss_f(labels, logits):
@@ -54,7 +62,7 @@ assert len(train_neg) == num_tr, f'Number of negative training data must be {num
 batch_size_per_class = 1000
 train_input_func = tfutil.balanced_read_tfrec_func([train_pos, train_neg], batch_size_per_class)
 
-inputs = tf.placeholder(dtype=tf.float32, shape=[None, 18])
+inputs = tf.placeholder(dtype=tf.float32, shape=[None, 28])
 labels = tf.placeholder(dtype=tf.int32, shape=[None])
 is_training = tf.placeholder(dtype=tf.bool)
 net = BaseTPMModel()
@@ -84,6 +92,5 @@ for i in range(num_te):
 num_steps = 20000000
 summ_steps = 10000
 ckpt_steps = 100000
-# model.train(num_steps, summ_steps, ckpt_steps,
-#             metric_opdefs, None,
-#             listeners, max_ckpt_to_keep=10, from_scratch=True)
+model.train(num_steps, summ_steps, ckpt_steps,
+              metric_opdefs, None,listeners, max_ckpt_to_keep=10, from_scratch=True)
